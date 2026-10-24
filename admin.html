@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="lo">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ຫຼັງບ້ານ – DN Game Vault</title>
+<link rel="icon" type="image/png" href="assets/img/favicon.png">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+<meta name="robots" content="noindex,nofollow">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;600;800&family=Sora:wght@600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/admin.css">
+</head>
+<body>
+<div id="app" class="shell" hidden>
+  <aside class="side">
+    <div class="brand"><img src="assets/img/logo.png" alt="" width="36" height="36"> DN Game Vault <small>ຫຼັງບ້ານ</small></div>
+    <nav id="nav">
+      <a href="#dash" data-v="dash">ພາບລວມ</a>
+      <a href="#orders" data-v="orders">ອໍເດີ <span id="nb" class="pill" hidden></span></a>
+      <a href="#products" data-v="products">ສິນຄ້າ</a>
+      <a href="#stockin" data-v="stockin">ຮັບເຄື່ອງເຂົ້າ</a>
+      <a href="#warranty" data-v="warranty">ຮັບປະກັນ / Serial</a>
+      <a href="#report" data-v="report">ລາຍງານ</a>
+      <a href="#settings" data-v="settings">ຕັ້ງຄ່າ</a>
+    </nav>
+    <div class="me"><span id="who" class="muted"></span>
+      <label class="snd"><input type="checkbox" id="snd" checked> ສຽງແຈ້ງເຕືອນອໍເດີໃໝ່</label>
+      <a id="shoplink" href="#" target="_blank" rel="noopener" hidden>ເບິ່ງໜ້າຮ້ານ</a>
+      <button class="ghost" id="logout">ອອກຈາກລະບົບ</button></div>
+  </aside>
+
+  <main class="main">
+    <header class="top"><h1 id="vt"></h1><div class="tb"><button class="btn" id="addS">+ ຂາຍໜ້າຮ້ານ</button><button class="btn" id="addP" hidden>+ ເພີ່ມສິນຄ້າ</button></div></header>
+
+    <section id="v-dash">
+      <div class="stats" id="stats"></div>
+      <div class="two">
+        <div class="card"><h2>ລາຍຮັບ 7 ວັນຜ່ານມາ</h2><div id="chart"></div></div>
+        <div class="card"><h2>ສິນຄ້າໃກ້ໝົດ</h2><div id="low" class="mini"></div></div>
+      </div>
+      <div class="card"><h2>ອໍເດີລ່າສຸດ</h2><div id="recent" class="list"></div></div>
+    </section>
+
+    <section id="v-orders" hidden>
+      <div class="bar"><div id="ofil" class="chips"></div><div class="tb"><select id="odate" aria-label="ຊ່ວງວັນທີ"><option value="all">ທຸກວັນ</option><option value="today">ມື້ນີ້</option><option value="week">7 ວັນຜ່ານມາ</option><option value="month">ເດືອນນີ້</option></select><input id="oq" type="search" placeholder="ຄົ້ນຫາຊື່, ເບີ ຫຼື ທີ່ຢູ່..."><button class="ghost" id="oexp">ສົ່ງອອກ CSV</button></div></div>
+      <div id="olist" class="list"></div>
+    </section>
+
+    <section id="v-report" hidden>
+      <div class="bar"><span class="muted">ຍອດຂາຍລາຍເດືອນ (ບໍ່ນັບອໍເດີທີ່ຍົກເລີກ)</span>
+        <div class="tb"><button class="ghost" id="gset">ຕັ້ງຄ່າ Google Sheets</button><button class="btn" id="gall">ບັນທຶກທຸກເດືອນລົງ Sheets</button></div></div>
+      <div id="rlist" class="list"></div>
+    </section>
+
+    <section id="v-stockin" hidden>
+      <form id="rform" class="card setform wide">
+        <label>ຊັບພາຍເອີ / ຜູ້ສະໜອງ<input id="r-sup" placeholder="ເຊັ່ນ ຮ້ານ ABC"></label>
+        <div class="rline">
+          <select id="r-prod" aria-label="ສິນຄ້າ"></select>
+          <input id="r-qty" type="number" min="1" value="1" aria-label="ຈຳນວນ" placeholder="ຈຳນວນ">
+          <input id="r-cost" type="number" min="0" placeholder="ລາຄາທຶນ/ຊິ້ນ" aria-label="ລາຄາທຶນຕໍ່ຊິ້ນ">
+          <button type="button" class="ghost" id="r-add">+ ເພີ່ມ</button>
+        </div>
+        <div id="r-items" class="sl"></div>
+        <label>ໝາຍເຫດ (ບໍ່ບັງຄັບ)<input id="r-note"></label>
+        <div class="tot2"><span>ມູນຄ່າຮັບເຂົ້າລວມ</span><b class="num" id="r-total">0 ₭</b></div>
+        <button class="btn">ບັນທຶກຮັບເຄື່ອງ ແລະ ເພີ່ມສະຕັອກ</button>
+        <p class="muted">ລະບົບເພີ່ມສະຕັອກ ແລະ ຄຳນວນລາຄາທຶນເຖິງສະເລ່ຍໃຫ້ເອງ (ຖ່ວງນ້ຳໜັກຕາມຈຳນວນ).</p>
+      </form>
+      <h2>ປະຫວັດຮັບເຄື່ອງ</h2>
+      <div id="hlist" class="list"></div>
+    </section>
+
+    <section id="v-warranty" hidden>
+      <div class="bar"><div id="wfil" class="chips"></div><div class="tb"><input id="wq" type="search" placeholder="ຄົ້ນຫາ: ເບີໂທ, ຊື່, Serial, ສິນຄ້າ..."></div></div>
+      <div id="wlist" class="list"></div>
+    </section>
+
+    <section id="v-settings" hidden>
+      <form id="setform" class="card setform">
+        <label>ເບີ WhatsApp ຂອງຮ້ານ<input id="st-wa" placeholder="020 5480 0302"></label>
+        <label>ທີ່ຢູ່ຮ້ານ<input id="st-addr" placeholder="ບ້ານ..., ເມືອງ..., ນະຄອນຫຼວງວຽງຈັນ"></label>
+        <label>ເວລາເປີດ-ປິດ<input id="st-hours" placeholder="ຈັນ–ເສົາ 08:30–18:00"></label>
+        <label>ລິ້ງ Facebook<input id="st-fb" placeholder="https://www.facebook.com/..."></label>
+        <label>ຂໍ້ຄວາມທ້າຍໃບເສັດ<input id="st-note" placeholder="ຂອບໃຈທີ່ອຸດໜູນ"></label>
+        <label>ລິ້ງແຜນທີ່ Google Maps<input id="st-map" placeholder="https://maps.app.goo.gl/..."></label>
+        <label>ຂໍ້ມູນການຊຳລະເງິນ (ເລກບັນຊີ, ຊື່ບັນຊີ)<textarea id="st-pay" rows="3"></textarea></label>
+        <label>ຂໍ້ມູນການຈັດສົ່ງ (ຄ່າສົ່ງ, ຂົນສົ່ງ)<textarea id="st-ship" rows="3"></textarea></label>
+        <button class="btn">ບັນທຶກການຕັ້ງຄ່າ</button>
+        <p class="muted">ຄ່າເຫຼົ່ານີ້ສະແດງໃນ footer ຂອງໜ້າຮ້ານ, ໃຊ້ເປັນເບີ WhatsApp ຮັບອໍເດີ ແລະ ພິມໃນໃບເສັດ.</p>
+      </form>
+    </section>
+
+    <section id="v-products" hidden>
+      <div class="bar"><div class="tb"><input id="pq" type="search" placeholder="ຄົ້ນຫາສິນຄ້າ..."><button class="ghost" id="pexp">ສົ່ງອອກ CSV</button></div></div>
+      <div id="plist" class="pgrid"></div>
+    </section>
+  </main>
+</div>
+
+<dialog id="pdlg">
+  <form id="pform" class="pform">
+    <div class="dh"><h2 id="ptitle">ເພີ່ມສິນຄ້າ</h2><button type="button" class="x" id="pclose" aria-label="ປິດ">&times;</button></div>
+    <div class="fields">
+      <label class="w2">ຊື່ສິນຄ້າ<input id="f-name" required></label>
+      <label>ຍີ່ຫໍ້<input id="f-brand" required></label>
+      <label>ໝວດ<select id="f-cat"><option>ແລັບທ໋ອບ</option><option>ຄອມຕັ້ງໂຕະ</option><option>ຊິ້ນສ່ວນ</option><option>ອຸປະກອນເສີມ</option></select></label>
+      <label>ລາຄາ (ກີບ)<input id="f-price" type="number" min="0" required></label>
+      <label>ສະຕັອກ<input id="f-stock" type="number" min="0" required></label>
+      <label>ລາຄາເກົ່າ (ຂີດຂ້າ, ບໍ່ບັງຄັບ)<input id="f-old" type="number" min="0"></label>
+      <label>ລາຄາທຶນ (ກີບ) ເຫັນສະເພາະ admin<input id="f-cost" type="number" min="0"></label>
+      <label>ຮັບປະກັນ<input id="f-war" placeholder="ເຊັ່ນ 12 ເດືອນ"></label>
+      <label>ສະພາບສິນຄ້າ<select id="f-cond"><option value="new">ເຄື່ອງໃໝ່</option><option value="open">ເປີດກ່ອງ (ຕົວໂຊ)</option><option value="refurb">ມືສອງ ຜ່ານການເຊັກ</option><option value="used">ມືສອງ</option></select></label>
+      <label class="w2">ຄຳອະທິບາຍສິນຄ້າ (ຈຸດເດັ່ນ, ເໝາະກັບການໃຊ້ງານແບບໃດ)<textarea id="f-desc" rows="4"></textarea></label>
+      <label class="w2 chk"><input type="checkbox" id="f-hide"> ເຊື່ອງສິນຄ້ານີ້ຈາກໜ້າຮ້ານຊົ່ວຄາວ (ບໍ່ລົບ)</label>
+      <label class="w2">ຮູບແຕ້ມສຳຮອງ (ໃຊ້ເມື່ອບໍ່ມີຮູບຖ່າຍ)
+        <select id="f-type"><option value="l">ແລັບທ໋ອບ</option><option value="lg">ແລັບທ໋ອບເກມ</option><option value="d">ຄອມຕັ້ງໂຕະ</option><option value="dg">ຄອມເກມ</option><option value="s">SSD</option><option value="r">RAM</option><option value="m">ເມົ້າ</option></select></label>
+      <label class="w2">ຮູບສິນຄ້າ (ສູງສຸດ 4 ຮູບ, ຍ່ອໃຫ້ອັດຕະໂນມັດ)
+        <input id="f-files" type="file" accept="image/*" multiple></label>
+      <div id="prev" class="prev w2"></div>
+      <label class="w2">ສະເປັກ (ແຖວລະອັນ ເຊັ່ນ RAM: 16 GB)<textarea id="f-specs" rows="4"></textarea></label>
+    </div>
+    <div class="dfoot"><button type="button" class="ghost" id="pcancel">ຍົກເລີກ</button><button class="btn">ບັນທຶກ</button></div>
+  </form>
+</dialog>
+<dialog id="sdlg">
+  <form id="sform" class="pform">
+    <div class="dh"><h2>ຂາຍໜ້າຮ້ານ</h2><button type="button" class="x" id="sclose" aria-label="ປິດ">&times;</button></div>
+    <div class="fields">
+      <label class="w2">ເລືອກສິນຄ້າ<select id="s-prod"></select></label>
+      <label>ຈຳນວນ<input id="s-qty" type="number" min="1" value="1"></label>
+      <label>&nbsp;<button type="button" class="ghost" id="s-add">+ ເພີ່ມລາຍການ</button></label>
+      <div id="s-items" class="w2 sl"></div>
+      <label>ຊື່ລູກຄ້າ (ບໍ່ບັງຄັບ)<input id="s-name"></label>
+      <label>ເບີໂທ (ບໍ່ບັງຄັບ)<input id="s-phone" type="tel"></label>
+      <label>ລາຄາລວມທີ່ຂາຍ (ກີບ)<input id="s-total" type="number" min="0" required></label>
+      <label>ວິທີຊຳລະ<select id="s-pay"><option value="cash">ເງິນສົດ</option><option value="transfer">ໂອນ / QR</option><option value="other">ອື່ນໆ</option></select></label>
+    </div>
+    <div class="dfoot"><button type="button" class="ghost" id="scancel">ຍົກເລີກ</button><button class="btn">ບັນທຶກການຂາຍ ແລະ ຫັກສະຕັອກ</button></div>
+  </form>
+</dialog>
+<dialog id="odlg">
+  <div class="dh"><h2 id="o-title">ອໍເດີ</h2><button type="button" class="x" id="oclose" aria-label="ປິດ">&times;</button></div>
+  <div id="obody" class="obody"></div>
+</dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.12.4/dist/sweetalert2.all.min.js"></script>
+<script type="module" src="assets/js/admin.js"></script>
+</body>
+</html>
