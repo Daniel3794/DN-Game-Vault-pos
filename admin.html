@@ -9,6 +9,18 @@
 <meta name="robots" content="noindex,nofollow">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;600;800&family=Sora:wght@600;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/admin.css">
+<style>
+.vedit{border:1px dashed var(--line,#1d2b47);border-radius:12px;padding:12px}
+.vedit p{margin:4px 0 10px;font-size:13px}
+.vrow{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) auto;gap:6px;margin-bottom:6px}
+.vrow input{width:100%;min-width:0;padding:8px 10px;border-radius:8px;border:1px solid var(--line,#1d2b47);background:var(--surf2,#131f37);color:var(--ink,#e9efff);font:inherit}
+.fields input:disabled{opacity:.6}
+.vrow{padding-bottom:8px;margin-bottom:10px;border-bottom:1px solid var(--line,#1d2b47)}
+.vimg{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}
+.vimg button{width:44px;height:44px;padding:0;overflow:hidden;border:2px solid var(--line,#1d2b47);border-radius:8px;background:none;cursor:pointer}
+.vimg button[aria-pressed="true"]{border-color:var(--cyan,#22d3ee);box-shadow:0 0 0 2px #22d3ee55}
+.vimg img{width:100%;height:100%;object-fit:cover;display:block}
+</style>
 </head>
 <body>
 <div id="app" class="shell" hidden>
@@ -111,13 +123,16 @@
       <label>ສະຕັອກ<input id="f-stock" type="number" min="0" required></label>
       <label>ລາຄາເກົ່າ (ຂີດຂ້າ, ບໍ່ບັງຄັບ)<input id="f-old" type="number" min="0"></label>
       <label>ລາຄາທຶນ (ກີບ) ເຫັນສະເພາະ admin<input id="f-cost" type="number" min="0"></label>
+      <div class="w2 vedit"><b>ແບບ / ຕົວເລືອກ (ສີ, ລາຍ, ຂະໜາດ) — ບໍ່ບັງຄັບ</b>
+        <p class="muted">ຖ້າເພີ່ມແບບ ລະບົບໃຊ້ລາຄາ ແລະ ສະຕັອກຂອງແຕ່ລະແບບ ແລະ ຄຳນວນ “ລາຄາ / ສະຕັອກ” ດ້ານເທິງໃຫ້ເອງ (ລາຄາຕ່ຳສຸດ, ສະຕັອກລວມ). ລາຄາທຶນໃຊ້ຮ່ວມກັນທັງສິນຄ້າ.</p>
+        <div id="v-rows"></div><button type="button" class="ghost" id="v-add">+ ເພີ່ມແບບ</button></div>
       <label>ຮັບປະກັນ<input id="f-war" placeholder="ເຊັ່ນ 12 ເດືອນ"></label>
       <label>ສະພາບສິນຄ້າ<select id="f-cond"><option value="new">ເຄື່ອງໃໝ່</option><option value="open">ເປີດກ່ອງ (ຕົວໂຊ)</option><option value="refurb">ມືສອງ ຜ່ານການເຊັກ</option><option value="used">ມືສອງ</option></select></label>
       <label class="w2">ຄຳອະທິບາຍສິນຄ້າ (ຈຸດເດັ່ນ, ເໝາະກັບການໃຊ້ງານແບບໃດ)<textarea id="f-desc" rows="4"></textarea></label>
       <label class="w2 chk"><input type="checkbox" id="f-hide"> ເຊື່ອງສິນຄ້ານີ້ຈາກໜ້າຮ້ານຊົ່ວຄາວ (ບໍ່ລົບ)</label>
       <label class="w2">ຮູບແຕ້ມສຳຮອງ (ໃຊ້ເມື່ອບໍ່ມີຮູບຖ່າຍ)
         <select id="f-type"><option value="l">ແລັບທ໋ອບ</option><option value="lg">ແລັບທ໋ອບເກມ</option><option value="d">ຄອມຕັ້ງໂຕະ</option><option value="dg">ຄອມເກມ</option><option value="s">SSD</option><option value="r">RAM</option><option value="m">ເມົ້າ</option></select></label>
-      <label class="w2">ຮູບສິນຄ້າ (ສູງສຸດ 4 ຮູບ, ຍ່ອໃຫ້ອັດຕະໂນມັດ)
+      <label class="w2">ຮູບສິນຄ້າ (ສູງສຸດ 6 ຮູບ, ຍ່ອໃຫ້ອັດຕະໂນມັດ)
         <input id="f-files" type="file" accept="image/*" multiple></label>
       <div id="prev" class="prev w2"></div>
       <label class="w2">ສະເປັກ (ແຖວລະອັນ ເຊັ່ນ RAM: 16 GB)<textarea id="f-specs" rows="4"></textarea></label>

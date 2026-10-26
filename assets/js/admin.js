@@ -11,6 +11,34 @@ const short = (n) => n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, "") + "M" :
 const ST = { new: "ໃໝ່", confirmed: "ຢືນຢັນແລ້ວ", delivered: "ສົ່ງແລ້ວ", cancelled: "ຍົກເລີກ" };
 const TITLES = { dash: "ພາບລວມ", orders: "ອໍເດີ", products: "ສິນຄ້າ", report: "ລາຍງານ", settings: "ຕັ້ງຄ່າ", stockin: "ຮັບເຄື່ອງເຂົ້າ", warranty: "ຮັບປະກັນ / Serial" };
 const LOW = 5;
+// ---------- ແບບ / ຕົວເລືອກ (variants): ແຕ່ລະແບບມີລາຄາ ແລະ ສະຕັອກຂອງຕົນ ----------
+let vrows = [];
+const vars = (p) => (Array.isArray(p.variants) ? p.variants : []);
+const totalStock = (p) => (vars(p).length ? vars(p).reduce((a, v) => a + (Number(v.stock) || 0), 0) : Number(p.stock) || 0);
+const skus = (inStock) => products.flatMap((p) => vars(p).length
+  ? vars(p).map((v, i) => ({ key: p._id + ":" + i, p, vi: i, name: p.name + " (" + v.name + ")", price: Number(v.price) || 0, stock: Number(v.stock) || 0 }))
+  : [{ key: p._id, p, vi: null, name: p.name, price: Number(p.price) || 0, stock: Number(p.stock) || 0 }]).filter((o) => !inStock || o.stock > 0);
+// ຄຳນວນຄ່າທີ່ຈະ update ຫຼັງປ່ຽນສະຕັອກ: changes=[{vi,d,name,msg}] (d ລົບ = ຫັກ). strict = ຖ້າບໍ່ພໍ ໃຫ້ error
+function stockUpd(x, changes, strict) {
+  const vs = Array.isArray(x.variants) ? x.variants.map((v) => Object.assign({}, v)) : [];
+  let stock = Number(x.stock) || 0;
+  changes.forEach((c) => {
+    const t = c.vi != null && vs[c.vi] ? vs[c.vi] : null;
+    if (vs.length && !t) return; // ລາຍການເກົ່າທີ່ບໍ່ມີແບບ ແຕ່ສິນຄ້ານີ້ມີແບບແລ້ວ: ບໍ່ປ່ຽນ
+    const left = (Number(t ? t.stock : stock) || 0) + c.d;
+    if (left < 0 && strict) throw new Error(c.name + (c.msg || " ເຫຼືອບໍ່ພໍ"));
+    if (t) t.stock = Math.max(0, left); else stock = Math.max(0, left);
+  });
+  return vs.length ? { variants: vs, stock: vs.reduce((a, v) => a + (Number(v.stock) || 0), 0) } : { stock };
+}
+// ປ່ຽນສະຕັອກຫຼາຍລາຍການໃນ transaction (ລວມລາຍການຂອງສິນຄ້າດຽວກັນ ແລ້ວຂຽນຄັ້ງດຽວ). sign +1 = ຄືນ, -1 = ຫັກ
+async function txStock(tx, lines, sign, msg) {
+  const g = {};
+  lines.forEach((l) => { (g[l.ref.path] = g[l.ref.path] || { ref: l.ref, ch: [] }).ch.push({ vi: l.vi, d: sign * l.qty, name: l.name, msg }); });
+  const gs = Object.values(g);
+  for (const x of gs) x.sn = await tx.get(x.ref);
+  gs.forEach((x) => tx.update(x.ref, stockUpd(x.sn.data() || {}, x.ch, sign < 0)));
+}
 let orders = [], products = [], costs = {}, settings = {}, receipts = [], unsubs = [], editing = null, imgs = [], ofil = "all";
 
 const sw = (o) => Swal.fire(Object.assign({ target: document.querySelector("dialog[open]") || document.body, background: "var(--surf)", color: "var(--ink)", confirmButtonColor: "#1f5bff", confirmButtonText: "ຕົກລົງ" }, o));
@@ -77,7 +105,7 @@ const profitOf = (o) => Number(o.total || 0) - (o.items || []).reduce((a, i) => 
 function dash() {
   const today = new Date().toDateString(), nNew = orders.filter((o) => o.status === "new").length;
   const rev = orders.filter((o) => ok(o) && when(o) && when(o).toDateString() === today).reduce((a, o) => a + Number(o.total || 0), 0);
-  const low = products.filter((p) => Number(p.stock) < LOW).sort((a, b) => a.stock - b.stock);
+  const low = skus(false).map((o) => ({ name: o.name, stock: o.stock })).filter((o) => o.stock < LOW).sort((a, b) => a.stock - b.stock);
   const nd = new Date();
   const prof = orders.filter((o) => { const t = when(o); return ok(o) && t && t.getMonth() === nd.getMonth() && t.getFullYear() === nd.getFullYear(); }).reduce((a, o) => a + profitOf(o), 0);
   $("stats").innerHTML = [["ລາຍຮັບວັນນີ້", fmt(rev)], ["ອໍເດີໃໝ່ (ລໍຖ້າ)", nNew], ["ອໍເດີທັງໝົດ", orders.length], ["ສິນຄ້າໃກ້ໝົດ", low.length], ["ລໍຖ້າກວດສະລິບ", orders.filter((o) => ok(o) && o.hasSlip && !o.paid).length], ["ຍອດຄ້າງຮັບເງິນ", fmt(orders.filter((o) => ok(o) && !o.paid && o.payMethod).reduce((a, o) => a + Number(o.total || 0), 0))], ["ກຳໄລເດືອນນີ້", Object.keys(costs).length ? fmt(prof) : "ຍັງບໍ່ມີລາຄາທຶນ"]]
@@ -115,9 +143,7 @@ document.addEventListener("click", async (e) => {
   if (!r.isConfirmed && !r.isDenied) return;
   try {
     if (r.isConfirmed && canRestock) await runTransaction(db, async (tx) => {
-      const lines = stockLines(o), snaps = [];
-      for (const l of lines) snaps.push(await tx.get(l.ref));
-      snaps.forEach((sn, k) => tx.update(lines[k].ref, { stock: (Number((sn.data() || {}).stock) || 0) + lines[k].qty }));
+      await txStock(tx, stockLines(o), 1);
       tx.delete(doc(db, "orders", o._id));
     });
     else await deleteDoc(doc(db, "orders", o._id));
@@ -135,18 +161,19 @@ function drawProducts() {
   const q = $("pq").value.toLowerCase().trim();
   const l = products.filter((p) => ((p.name || "") + " " + (p.brand || "") + " " + (p.category || "")).toLowerCase().includes(q));
   $("plist").innerHTML = l.map((p) => {
-    const s = Number(p.stock), im = (p.images || [])[0];
+    const vs = vars(p), s = totalStock(p), im = (p.images || [])[0], pr = vs.length ? Math.min(...vs.map((v) => Number(v.price) || 0)) : Number(p.price), vr = vs.length > 1 && vs.some((v) => Number(v.price) !== Number(vs[0].price));
     return '<article class="pc">' + (im ? '<img src="' + esc(im) + '" alt="' + esc(p.name) + '">' : '<div class="ph">' + esc((p.brand || "?")[0]) + "</div>") +
       '<div class="pb"><b>' + esc(p.name) + '</b>' + (p.hidden ? ' <span class="badge low">ເຊື່ອງ</span>' : "") + '<span class="muted">' + esc(p.brand) + " · " + esc(p.category) + "</span>" +
-      '<div class="r"><b class="num">' + fmt(p.price) + '</b><span class="badge ' + (s < 1 ? "out" : s < LOW ? "low" : "") + '">' + (s < 1 ? "ໝົດ" : "ມີ " + s) + "</span></div></div>" +
-      '<div class="stk"><button class="ghost" data-stk="' + p._id + '" data-d="-1" aria-label="ຫຼຸດສະຕັອກ">−</button><span>ສະຕັອກ ' + (Number(p.stock) || 0) + '</span><button class="ghost" data-stk="' + p._id + '" data-d="1" aria-label="ເພີ່ມສະຕັອກ">+</button></div>' +
+      '<div class="r"><b class="num">' + (vr ? "ເລີ່ມ " : "") + fmt(pr) + '</b><span class="badge ' + (s < 1 ? "out" : s < LOW ? "low" : "") + '">' + (s < 1 ? "ໝົດ" : "ມີ " + s) + "</span></div></div>" +
+      (vs.length ? vs.map((v, i) => '<div class="stk"><button class="ghost" data-stk="' + p._id + '" data-vi="' + i + '" data-d="-1" aria-label="ຫຼຸດສະຕັອກ">−</button><span>' + esc(v.name) + ' ' + (Number(v.stock) || 0) + '</span><button class="ghost" data-stk="' + p._id + '" data-vi="' + i + '" data-d="1" aria-label="ເພີ່ມສະຕັອກ">+</button></div>').join("")
+        : '<div class="stk"><button class="ghost" data-stk="' + p._id + '" data-d="-1" aria-label="ຫຼຸດສະຕັອກ">−</button><span>ສະຕັອກ ' + (Number(p.stock) || 0) + '</span><button class="ghost" data-stk="' + p._id + '" data-d="1" aria-label="ເພີ່ມສະຕັອກ">+</button></div>') +
       '<div class="acts"><button class="ghost" data-edit="' + p._id + '">ແກ້ໄຂ</button><button class="ghost" data-dup="' + p._id + '">ສຳເນົາ</button><button class="ghost" data-del="' + p._id + '">ລົບ</button></div></article>';
   }).join("") || '<div class="empty">ຍັງບໍ່ມີສິນຄ້າ. ກົດ “+ ເພີ່ມສິນຄ້າ” ເພື່ອເລີ່ມ.</div>';
 }
 $("pq").oninput = drawProducts;
 $("plist").onclick = (e) => {
   const st = e.target.closest("[data-stk]"), du = e.target.closest("[data-dup]");
-  if (st) { adjustStock(st.dataset.stk, +st.dataset.d); return; }
+  if (st) { adjustStock(st.dataset.stk, +st.dataset.d, st.dataset.vi); return; }
   if (du) { openForm(products.find((p) => p._id === du.dataset.dup), true); return; }
   const ed = e.target.closest("[data-edit]"), dl = e.target.closest("[data-del]");
   if (ed) openForm(products.find((p) => p._id === ed.dataset.edit));
@@ -162,6 +189,7 @@ function openForm(p, dup) {
   if (p) { $("f-name").value = p.name + (dup ? " (ສຳເນົາ)" : ""); $("f-brand").value = p.brand; $("f-cat").value = p.category; $("f-type").value = p.type || "l";
     $("f-price").value = p.price; $("f-stock").value = p.stock; $("f-cost").value = costs[p._id] ?? costs[p.id] ?? "";
     $("f-old").value = p.oldPrice || ""; $("f-hide").checked = !!p.hidden; $("f-war").value = p.warranty || ""; $("f-cond").value = p.condition || "new"; $("f-desc").value = p.description || ""; $("f-specs").value = (p.specs || []).map((s) => s.k + ": " + s.v).join("\n"); }
+  vrows = p && Array.isArray(p.variants) ? p.variants.map((v) => ({ name: v.name || "", price: v.price ?? "", stock: v.stock ?? "", image: v.image || "", imageIndex: Number.isInteger(v.imageIndex) ? v.imageIndex : null })) : []; drawV();
   renderPrev(); pd.showModal();
 }
 $("addP").onclick = () => openForm(null);
@@ -175,18 +203,36 @@ function shrink(file, max = 800, q = 0.8) {
     im.onerror = () => no(new Error("ອ່ານຮູບບໍ່ໄດ້")); im.src = u;
   });
 }
-function renderPrev() { $("prev").innerHTML = imgs.map((u, i) => '<div><img src="' + u + '" alt="ຮູບ ' + (i + 1) + '"><button type="button" data-rm="' + i + '" aria-label="ລົບຮູບ">&times;</button></div>').join(""); }
+function renderPrev() { $("prev").innerHTML = imgs.map((u, i) => '<div><img src="' + u + '" alt="ຮູບ ' + (i + 1) + '"><button type="button" data-rm="' + i + '" aria-label="ລົບຮູບ">&times;</button></div>').join(""); drawV(); }
 $("f-files").onchange = async (e) => {
-  try { for (const f of Array.from(e.target.files)) { if (imgs.length >= 4) break; imgs.push(await shrink(f)); } } catch (x) { fail(x); }
+  try { for (const f of Array.from(e.target.files)) { if (imgs.length >= 6) break; imgs.push(await shrink(f)); } } catch (x) { fail(x); }
   e.target.value = ""; renderPrev();
 };
-$("prev").onclick = (e) => { const b = e.target.closest("[data-rm]"); if (b) { imgs.splice(+b.dataset.rm, 1); renderPrev(); } };
+$("prev").onclick = (e) => { const b = e.target.closest("[data-rm]"); if (b) { const i = +b.dataset.rm; imgs.splice(i, 1); vrows.forEach((v) => { if (v.imageIndex === i) v.imageIndex = null; else if (v.imageIndex > i) v.imageIndex--; }); renderPrev(); } };
+function drawV() {
+  $("v-rows").innerHTML = vrows.map((v, i) => '<div class="vrow"><input data-vi="' + i + '" data-k="name" value="' + esc(v.name) + '" placeholder="ຊື່ແບບ (ເຊັ່ນ ແດງ, L)" aria-label="ຊື່ແບບ"><input data-vi="' + i + '" data-k="price" type="number" min="0" value="' + esc(v.price) + '" placeholder="ລາຄາ" aria-label="ລາຄາ"><input data-vi="' + i + '" data-k="stock" type="number" min="0" value="' + esc(v.stock) + '" placeholder="ສະຕັອກ" aria-label="ສະຕັອກ"><button type="button" class="ghost" data-vrm="' + i + '" aria-label="ເອົາອອກ">&times;</button><div class="vimg" role="group" aria-label="ຮູບຂອງແບບນີ້"><span class="muted">ຮູບຂອງແບບນີ້:</span>' + (imgs.length ? imgs.map((u, k) => '<button type="button" data-vimg="' + i + '" data-k="' + k + '" aria-pressed="' + (v.imageIndex === k) + '" aria-label="ຮູບ ' + (k + 1) + '"><img src="' + u + '" alt=""></button>').join("") : '<small class="muted">ອັບໂຫຼດຮູບສິນຄ້າດ້ານລຸ່ມກ່ອນ ແລ້ວກັບມາເລືອກ</small>') + '</div></div>').join("");
+  syncV();
+}
+function syncV() { // ມີແບບ → ຊ່ອງລາຄາ/ສະຕັອກຫຼັກຖືກຄຳນວນເອງ (ລາຄາຕ່ຳສຸດ, ສະຕັອກລວມ)
+  const on = vrows.length > 0, named = vrows.filter((v) => String(v.name).trim());
+  $("f-price").disabled = $("f-stock").disabled = on;
+  if (on) { $("f-price").value = named.length ? Math.min(...named.map((v) => Number(v.price) || 0)) : ""; $("f-stock").value = named.reduce((a, v) => a + (Number(v.stock) || 0), 0); }
+}
+$("v-add").onclick = () => { vrows.push({ name: "", price: vrows.length ? "" : $("f-price").value, stock: vrows.length ? "" : $("f-stock").value }); drawV(); };
+$("v-rows").oninput = (e) => { const t = e.target; if (t.dataset.vi !== undefined && vrows[+t.dataset.vi]) { vrows[+t.dataset.vi][t.dataset.k] = t.value; syncV(); } };
+$("v-rows").onclick = (e) => {
+  const m = e.target.closest("[data-vimg]");
+  if (m) { const v = vrows[+m.dataset.vimg], k = +m.dataset.k; if (v) { v.imageIndex = v.imageIndex === k ? null : k; drawV(); } return; }
+  const b = e.target.closest("[data-vrm]"); if (b) { vrows.splice(+b.dataset.vrm, 1); drawV(); }
+};
 $("pform").onsubmit = (e) => {
   e.preventDefault();
   if (imgs.join("").length > 800000) { sw({ icon: "warning", title: "ຮູບໃຫຍ່ເກີນ", text: "ລົບບາງຮູບອອກ ແລ້ວລອງໃໝ່" }); return; }
+  const vs = vrows.map((v) => Object.assign({ name: String(v.name).trim(), price: Number(v.price) || 0, stock: Math.max(0, Number(v.stock) || 0) }, v.image ? { image: v.image } : {}, Number.isInteger(v.imageIndex) && v.imageIndex < imgs.length ? { imageIndex: v.imageIndex } : {})).filter((v) => v.name);
+  if (vrows.length && !vs.length) { sw({ icon: "warning", title: "ໃສ່ຊື່ແບບຢ່າງໜ້ອຍ 1 ແບບ", text: "ຫຼື ກົດ × ເອົາແຖວແບບອອກ" }); return; }
   const specs = $("f-specs").value.split("\n").map((l) => { const i = l.indexOf(":"); return i > 0 ? { k: l.slice(0, i).trim(), v: l.slice(i + 1).trim() } : null; }).filter(Boolean);
   const data = { name: $("f-name").value.trim(), brand: $("f-brand").value.trim(), category: $("f-cat").value, type: $("f-type").value,
-                 price: Number($("f-price").value), stock: Number($("f-stock").value), specs, images: imgs, oldPrice: Number($("f-old").value) || 0, hidden: $("f-hide").checked, warranty: $("f-war").value.trim(), condition: $("f-cond").value, description: $("f-desc").value.trim() };
+                 price: vs.length ? Math.min(...vs.map((v) => v.price)) : Number($("f-price").value), stock: vs.length ? vs.reduce((a, v) => a + v.stock, 0) : Number($("f-stock").value), variants: vs, specs, images: imgs, oldPrice: Number($("f-old").value) || 0, hidden: $("f-hide").checked, warranty: $("f-war").value.trim(), condition: $("f-cond").value, description: $("f-desc").value.trim() };
   const prod = editing ? products.find((x) => x._id === editing) : null, cost = Number($("f-cost").value) || 0;
   const withId = Object.assign({}, data, prod && prod.id != null ? {} : { id: Date.now() % 1000000000 }); // ສິນຄ້າທີ່ເພີ່ມເອງໃນ Console ຈະໄດ້ id ຕອນບັນທຶກ
   (editing ? updateDoc(doc(db, "products", editing), clean(withId)).then(() => editing) : addDoc(collection(db, "products"), clean(withId)).then((r) => r.id))
@@ -203,17 +249,16 @@ function drawSale() {
 }
 $("addS").onclick = () => {
   sale = []; $("sform").reset(); $("s-qty").value = 1;
-  $("s-prod").innerHTML = products.filter((p) => Number(p.stock) > 0).map((p) => '<option value="' + p._id + '">' + esc(p.name) + " — " + fmt(p.price) + " (ເຫຼືອ " + esc(p.stock) + ")</option>").join("");
+  $("s-prod").innerHTML = skus(true).map((o) => '<option value="' + esc(o.key) + '">' + esc(o.name) + " — " + fmt(o.price) + " (ເຫຼືອ " + o.stock + ")</option>").join("");
   if (!$("s-prod").options.length) { sw({ icon: "info", title: "ບໍ່ມີສິນຄ້າໃນສະຕັອກ" }); return; }
   drawSale(); sd.showModal();
 };
 $("s-add").onclick = () => {
-  const p = products.find((x) => x._id === $("s-prod").value), q = Math.max(1, parseInt($("s-qty").value, 10) || 1);
-  if (!p) return;
-  const have = (sale.find((l) => l.doc === p._id) || { qty: 0 }).qty;
-  if (have + q > Number(p.stock)) { sw({ icon: "warning", title: "ສະຕັອກບໍ່ພໍ", text: p.name + " ເຫຼືອ " + p.stock + " ຊິ້ນ" }); return; }
-  const l = sale.find((x) => x.doc === p._id);
-  if (l) l.qty += q; else sale.push({ doc: p._id, id: p.id != null ? p.id : p._id, name: p.name, price: Number(p.price), qty: q });
+  const o = skus(true).find((x) => x.key === $("s-prod").value), q = Math.max(1, parseInt($("s-qty").value, 10) || 1);
+  if (!o) return;
+  const l = sale.find((x) => x.key === o.key), have = l ? l.qty : 0;
+  if (have + q > o.stock) { sw({ icon: "warning", title: "ສະຕັອກບໍ່ພໍ", text: o.name + " ເຫຼືອ " + o.stock + " ຊິ້ນ" }); return; }
+  if (l) l.qty += q; else sale.push({ key: o.key, doc: o.p._id, vi: o.vi, id: o.p.id != null ? o.p.id : o.p._id, name: o.name, price: o.price, qty: q });
   drawSale();
 };
 $("s-items").onclick = (e) => { const b = e.target.closest("[data-srm]"); if (b) { sale.splice(+b.dataset.srm, 1); drawSale(); } };
@@ -223,11 +268,9 @@ $("sform").onsubmit = (e) => {
   e.preventDefault();
   if (!sale.length) { sw({ icon: "warning", title: "ຍັງບໍ່ໄດ້ເພີ່ມລາຍການ" }); return; }
   const lines = sale.slice(), total = Number($("s-total").value) || saleSum(), name = $("s-name").value.trim() || "ລູກຄ້າໜ້າຮ້ານ", phone = $("s-phone").value.trim(), payment = $("s-pay").value;
-  const oref = doc(collection(db, "orders")), sitems = lines.map((l) => ({ id: l.id, pid: l.doc, name: l.name, qty: l.qty, price: l.price, cost: Number(costs[l.doc] ?? costs[l.id] ?? 0), serial: (l.serial || "").trim(), war: (products.find((p) => p._id === l.doc) || {}).warranty || "" }));
+  const oref = doc(collection(db, "orders")), sitems = lines.map((l) => ({ id: l.id, pid: l.doc, vi: l.vi, name: l.name, qty: l.qty, price: l.price, cost: Number(costs[l.doc] ?? costs[l.id] ?? 0), serial: (l.serial || "").trim(), war: (products.find((p) => p._id === l.doc) || {}).warranty || "" }));
   runTransaction(db, async (tx) => {
-    const refs = lines.map((l) => doc(db, "products", l.doc)), snaps = [];
-    for (const r of refs) snaps.push(await tx.get(r));
-    snaps.forEach((s, k) => { const left = s.data().stock - lines[k].qty; if (left < 0) throw new Error(lines[k].name + " ເຫຼືອບໍ່ພໍ"); tx.update(refs[k], { stock: left }); });
+    await txStock(tx, lines.map((l) => ({ ref: doc(db, "products", l.doc), vi: l.vi, qty: l.qty, name: l.name })), -1);
     tx.set(oref, clean({ name, phone, payment, address: "ຂາຍໜ້າຮ້ານ", source: "store", status: "delivered", paid: true, total,
       items: sitems, createdAt: serverTimestamp() }));
   }).then(() => { sd.close(); return sw({ icon: "success", title: "ບັນທຶກການຂາຍແລ້ວ", text: "ສະຕັອກຖືກຫັກແລ້ວ", showCancelButton: true, confirmButtonText: "ພິມໃບເສັດ", cancelButtonText: "ປິດ" }); })
@@ -303,7 +346,7 @@ const PAY = { "": "ຍັງບໍ່ລະບຸ", cash: "ເງິນສົດ
 const normPhone = (v) => { const d = String(v || "").replace(/\D/g, ""); return !d ? "" : d.indexOf("856") === 0 ? d : "856" + d.replace(/^0+/, ""); };
 const phoneOf = (o) => o.phone || ((String(o.name || "").match(/\d[\d\s-]{6,}\d/) || [""])[0]);
 function stockLines(o) {
-  return (o.items || []).map((i) => { const p = products.find((x) => x._id === i.pid) || products.find((x) => x.id == i.id); return p ? { ref: doc(db, "products", p._id), qty: Number(i.qty || 0), name: i.name } : null; }).filter(Boolean);
+  return (o.items || []).map((i) => { const p = products.find((x) => x._id === i.pid) || products.find((x) => x.id == i.id); return p ? { ref: doc(db, "products", p._id), qty: Number(i.qty || 0), name: i.name, vi: i.vi } : null; }).filter(Boolean);
 }
 async function setStatus(id, status) {
   const o = orders.find((x) => x._id === id); if (!o) return;
@@ -315,13 +358,7 @@ async function setStatus(id, status) {
   try {
     if (!toCancel && !fromCancel) await updateDoc(doc(db, "orders", id), p);
     else await runTransaction(db, async (tx) => {
-      const lines = stockLines(o), snaps = [];
-      for (const l of lines) snaps.push(await tx.get(l.ref));
-      snaps.forEach((sn, k) => {
-        const cur = Number((sn.data() || {}).stock) || 0, q = lines[k].qty;
-        if (fromCancel && cur < q) throw new Error(lines[k].name + " ສະຕັອກບໍ່ພໍ ຈຶ່ງເປີດອໍເດີຄືນບໍ່ໄດ້");
-        tx.update(lines[k].ref, { stock: toCancel ? cur + q : cur - q });
-      });
+      await txStock(tx, stockLines(o), toCancel ? 1 : -1, " ສະຕັອກບໍ່ພໍ ຈຶ່ງເປີດອໍເດີຄືນບໍ່ໄດ້");
       tx.update(doc(db, "orders", id), Object.assign({}, p, { restocked: toCancel }));
     });
     toast(toCancel ? "ຍົກເລີກ ແລະ ຄືນສະຕັອກແລ້ວ" : "ອັບເດດສະຖານະແລ້ວ");
@@ -437,13 +474,13 @@ $("oexp").onclick = () => {
 };
 $("pexp").onclick = () => {
   if (!products.length) { sw({ icon: "info", title: "ຍັງບໍ່ມີສິນຄ້າ" }); return; }
-  download("products-" + today10() + ".csv", csv([["ຊື່", "ຍີ່ຫໍ້", "ໝວດ", "ລາຄາຂາຍ (ກີບ)", "ລາຄາເກົ່າ", "ລາຄາທຶນ (ກີບ)", "ສະຕັອກ", "ຮັບປະກັນ", "ສະພາບ", "ເຊື່ອງ"]]
-    .concat(products.map((p) => [p.name, p.brand, p.category, p.price, p.oldPrice || "", costs[p._id] ?? costs[p.id] ?? "", p.stock, p.warranty || "", p.condition || "new", p.hidden ? "ເຊື່ອງ" : ""]))));
+  download("products-" + today10() + ".csv", csv([["ຊື່", "ຍີ່ຫໍ້", "ໝວດ", "ລາຄາຂາຍ (ກີບ)", "ລາຄາເກົ່າ", "ລາຄາທຶນ (ກີບ)", "ສະຕັອກ", "ຮັບປະກັນ", "ສະພາບ", "ເຊື່ອງ", "ແບບ (ຊື່:ລາຄາ/ສະຕັອກ)"]]
+    .concat(products.map((p) => [p.name, p.brand, p.category, p.price, p.oldPrice || "", costs[p._id] ?? costs[p.id] ?? "", p.stock, p.warranty || "", p.condition || "new", p.hidden ? "ເຊື່ອງ" : "", vars(p).map((v) => v.name + ":" + v.price + "/" + v.stock).join("; ")]))));
 };
-function adjustStock(id, d) {
+function adjustStock(id, d, vi) {
   return runTransaction(db, async (tx) => {
     const r = doc(db, "products", id), sn = await tx.get(r);
-    tx.update(r, { stock: Math.max(0, (Number((sn.data() || {}).stock) || 0) + d) });
+    tx.update(r, stockUpd(sn.data() || {}, [{ vi: vi === undefined || vi === "" ? null : +vi, d }], false));
   }).catch(fail);
 }
 let known = null, audio = null;
@@ -468,20 +505,20 @@ function warText(i) { const p = products.find((x) => x._id === i.pid) || product
 let rlines = [];
 function drawStockin() {
   const keep = $("r-prod").value;
-  $("r-prod").innerHTML = products.map((p) => '<option value="' + p._id + '">' + esc(p.name) + " (ສະຕັອກ " + (Number(p.stock) || 0) + ")</option>").join("");
-  if (keep && products.some((p) => p._id === keep)) $("r-prod").value = keep;
+  $("r-prod").innerHTML = skus(false).map((o) => '<option value="' + esc(o.key) + '">' + esc(o.name) + " (ສະຕັອກ " + o.stock + ")</option>").join("");
+  if (keep && skus(false).some((o) => o.key === keep)) $("r-prod").value = keep;
   $("r-items").innerHTML = rlines.map((l, i) => "<div><span>" + esc(l.name) + " ×" + l.qty + " @ " + fmt(l.cost) + '</span><span class="num">' + fmt(l.qty * l.cost) + '</span><button type="button" data-rrm="' + i + '" aria-label="ເອົາອອກ">&times;</button></div>').join("");
   $("r-total").textContent = fmt(rlines.reduce((a, l) => a + l.qty * l.cost, 0));
   $("hlist").innerHTML = receipts.map((r) => '<article class="ord s-delivered"><div><b>' + esc(r.supplier || "ບໍ່ລະບຸຊັບພາຍເອີ") + "</b><small>" + esc(fdate(when(r))) + (r.note ? " · " + esc(r.note) : "") + "</small></div><div>" +
     (r.items || []).map((i) => esc(i.name) + " ×" + esc(i.qty)).join(", ") + '</div><div style="text-align:right"><b class="num">' + fmt(r.total) + "</b></div></article>").join("") || '<div class="empty">ຍັງບໍ່ມີປະຫວັດຮັບເຄື່ອງ</div>';
 }
-$("r-prod").onchange = () => { const p = products.find((x) => x._id === $("r-prod").value); $("r-cost").value = p ? (costs[p._id] ?? costs[p.id] ?? "") : ""; };
+$("r-prod").onchange = () => { const o = skus(false).find((x) => x.key === $("r-prod").value), p = o && o.p; $("r-cost").value = p ? (costs[p._id] ?? costs[p.id] ?? "") : ""; };
 $("r-add").onclick = () => {
-  const p = products.find((x) => x._id === $("r-prod").value), qty = Math.max(1, parseInt($("r-qty").value, 10) || 1), cost = Number($("r-cost").value);
+  const o = skus(false).find((x) => x.key === $("r-prod").value), p = o && o.p, qty = Math.max(1, parseInt($("r-qty").value, 10) || 1), cost = Number($("r-cost").value);
   if (!p) { sw({ icon: "info", title: "ຍັງບໍ່ມີສິນຄ້າ ໃຫ້ເພີ່ມສິນຄ້າກ່ອນ" }); return; }
   if ($("r-cost").value === "" || !(cost >= 0)) { sw({ icon: "warning", title: "ກະລຸນາໃສ່ລາຄາທຶນຕໍ່ຊິ້ນ" }); return; }
-  const l = rlines.find((x) => x.doc === p._id);
-  if (l) { l.cost = Math.round((l.cost * l.qty + cost * qty) / (l.qty + qty)); l.qty += qty; } else rlines.push({ doc: p._id, id: p.id != null ? p.id : p._id, name: p.name, qty, cost });
+  const l = rlines.find((x) => x.key === o.key);
+  if (l) { l.cost = Math.round((l.cost * l.qty + cost * qty) / (l.qty + qty)); l.qty += qty; } else rlines.push({ key: o.key, doc: p._id, vi: o.vi, id: p.id != null ? p.id : p._id, name: o.name, qty, cost });
   $("r-qty").value = 1; drawStockin();
 };
 $("r-items").onclick = (e) => { const b = e.target.closest("[data-rrm]"); if (b) { rlines.splice(+b.dataset.rrm, 1); drawStockin(); } };
@@ -490,14 +527,17 @@ $("rform").onsubmit = (e) => {
   if (!rlines.length) { sw({ icon: "warning", title: "ຍັງບໍ່ໄດ້ເພີ່ມລາຍການ" }); return; }
   const lines = rlines.slice(), supplier = $("r-sup").value.trim(), note = $("r-note").value.trim(), total = lines.reduce((a, l) => a + l.qty * l.cost, 0);
   runTransaction(db, async (tx) => {
-    const refs = lines.map((l) => doc(db, "products", l.doc)), snaps = [];
-    for (const r of refs) snaps.push(await tx.get(r));
-    lines.forEach((l, k) => {
-      const stock = Number((snaps[k].data() || {}).stock) || 0, old = costs[l.doc] ?? costs[l.id];
-      const avg = stock > 0 && old != null ? Math.round((stock * Number(old) + l.qty * l.cost) / (stock + l.qty)) : l.cost;
-      tx.update(refs[k], { stock: stock + l.qty }); tx.set(doc(db, "costs", l.doc), { cost: avg });
+    const gs = {};
+    lines.forEach((l) => { (gs[l.doc] = gs[l.doc] || { ref: doc(db, "products", l.doc), id: l.id, doc: l.doc, ls: [] }).ls.push(l); });
+    const G = Object.values(gs);
+    for (const g of G) g.sn = await tx.get(g.ref);
+    G.forEach((g) => {
+      const x = g.sn.data() || {}, stock = totalStock(x), old = costs[g.doc] ?? costs[g.id];
+      const addQ = g.ls.reduce((a, l) => a + l.qty, 0), addC = g.ls.reduce((a, l) => a + l.qty * l.cost, 0);
+      const avg = stock > 0 && old != null ? Math.round((stock * Number(old) + addC) / (stock + addQ)) : Math.round(addC / addQ);
+      tx.update(g.ref, stockUpd(x, g.ls.map((l) => ({ vi: l.vi, d: l.qty })), false)); tx.set(doc(db, "costs", g.doc), { cost: avg });
     });
-    tx.set(doc(collection(db, "receipts")), clean({ supplier, note, total, items: lines.map((l) => ({ id: l.id, pid: l.doc, name: l.name, qty: l.qty, cost: l.cost })), createdAt: serverTimestamp() }));
+    tx.set(doc(collection(db, "receipts")), clean({ supplier, note, total, items: lines.map((l) => ({ id: l.id, pid: l.doc, vi: l.vi, name: l.name, qty: l.qty, cost: l.cost })), createdAt: serverTimestamp() }));
   }).then(() => { rlines = []; $("rform").reset(); drawStockin(); toast("ບັນທຶກຮັບເຄື່ອງ ແລະ ເພີ່ມສະຕັອກແລ້ວ"); }).catch(fail);
 };
 
