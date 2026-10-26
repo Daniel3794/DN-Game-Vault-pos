@@ -26,7 +26,6 @@
     <div class="me"><span id="who" class="muted"></span>
       <label class="snd"><input type="checkbox" id="snd" checked> ສຽງແຈ້ງເຕືອນອໍເດີໃໝ່</label>
       <a href="https://daniel3794.github.io/DN-Game-Vault-pos-sales/" target="_blank">ເບິ່ງໜ້າຮ້ານ</a>
-      <a id="shoplink" href="#" target="_blank" rel="noopener" hidden>ເບິ່ງໜ້າຮ້ານ</a>
       <button class="ghost" id="logout">ອອກຈາກລະບົບ</button></div>
   </aside>
 
@@ -43,7 +42,7 @@
     </section>
 
     <section id="v-orders" hidden>
-      <div class="bar"><div id="ofil" class="chips"></div><div class="tb"><select id="odate" aria-label="ຊ່ວງວັນທີ"><option value="all">ທຸກວັນ</option><option value="today">ມື້ນີ້</option><option value="week">7 ວັນຜ່ານມາ</option><option value="month">ເດືອນນີ້</option></select><input id="oq" type="search" placeholder="ຄົ້ນຫາຊື່, ເບີ ຫຼື ທີ່ຢູ່..."><button class="ghost" id="oexp">ສົ່ງອອກ CSV</button></div></div>
+      <div class="bar"><div id="ofil" class="chips"></div><div class="tb"><select id="opay" aria-label="ສະຖານະການຊຳລະ"><option value="all">ທຸກການຊຳລະ</option><option value="slip">ລໍຖ້າກວດສະລິບ</option><option value="wait">ລໍຖ້າໂອນ (ຍັງບໍ່ມີສະລິບ)</option><option value="cod">ເກັບເງິນປາຍທາງ / ຈ່າຍທີ່ຮ້ານ</option><option value="paid">ຊຳລະແລ້ວ</option></select><select id="odate" aria-label="ຊ່ວງວັນທີ"><option value="all">ທຸກວັນ</option><option value="today">ມື້ນີ້</option><option value="week">7 ວັນຜ່ານມາ</option><option value="month">ເດືອນນີ້</option></select><input id="oq" type="search" placeholder="ຄົ້ນຫາຊື່, ເບີ ຫຼື ທີ່ຢູ່..."><button class="ghost" id="oexp">ສົ່ງອອກ CSV</button></div></div>
       <div id="olist" class="list"></div>
     </section>
 
@@ -87,6 +86,8 @@
         <label>ລິ້ງແຜນທີ່ Google Maps<input id="st-map" placeholder="https://maps.app.goo.gl/..."></label>
         <label>ຂໍ້ມູນການຊຳລະເງິນ (ເລກບັນຊີ, ຊື່ບັນຊີ)<textarea id="st-pay" rows="3"></textarea></label>
         <label>ຂໍ້ມູນການຈັດສົ່ງ (ຄ່າສົ່ງ, ຂົນສົ່ງ)<textarea id="st-ship" rows="3"></textarea></label>
+        <label>ຮູບ QR ຮັບເງິນ (LAO QR / OnePay) ບໍ່ອັບໂຫຼດ = ໃຊ້ຮູບມາດຕະຖານຂອງເວັບ<input id="st-qr" type="file" accept="image/*"></label>
+        <div id="st-qr-prev" class="prev"></div>
         <button class="btn">ບັນທຶກການຕັ້ງຄ່າ</button>
         <p class="muted">ຄ່າເຫຼົ່ານີ້ສະແດງໃນ footer ຂອງໜ້າຮ້ານ, ໃຊ້ເປັນເບີ WhatsApp ຮັບອໍເດີ ແລະ ພິມໃນໃບເສັດ.</p>
       </form>

@@ -1,7 +1,7 @@
 // ຫຼັງບ້ານ: ພາບລວມ, ອໍເດີ, ສິນຄ້າ (Firebase Auth + Firestore realtime)
 import { db, auth, configured, shopUrl } from "./firebase-config.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { collection, onSnapshot, query, orderBy, doc, addDoc, deleteDoc, updateDoc, setDoc, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, onSnapshot, query, orderBy, doc, addDoc, deleteDoc, updateDoc, setDoc, getDoc, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const $ = (id) => document.getElementById(id);
 if (shopUrl) { $("shoplink").href = shopUrl; $("shoplink").hidden = false; }
@@ -66,7 +66,7 @@ function route() {
 window.addEventListener("hashchange", route);
 
 // ---------- ພາບລວມ ----------
-const orderRow = (o, ctl) => '<article class="ord s-' + esc(o.status) + '" data-view="' + o._id + '"><div><b>' + esc(o.name) + '</b>' + (o.source === "store" ? ' <span class="badge">ໜ້າຮ້ານ</span>' : "") + '<small>' + esc(fdate(when(o))) + ' · ' + esc(o.phone ? o.phone + " · " : "") + esc(o.address) + '</small></div>' +
+const orderRow = (o, ctl) => '<article class="ord s-' + esc(o.status) + '" data-view="' + o._id + '"><div><b>' + esc(o.name) + '</b>' + (o.source === "store" ? ' <span class="badge">ໜ້າຮ້ານ</span>' : "") + payBadge(o) + '<small>' + esc(fdate(when(o))) + ' · ' + esc(o.phone ? o.phone + " · " : "") + esc(o.address) + '</small></div>' +
   '<div>' + (o.items || []).map((i) => esc(i.name) + " ×" + esc(i.qty)).join(", ") + '</div>' +
   '<div style="text-align:right"><b class="num">' + fmt(o.total) + '</b><br>' + ctl + ' <button class="ghost del" data-odel="' + o._id + '" aria-label="ລົບອໍເດີ">ລົບ</button></div></article>';
 const sel = (o) => '<select class="st ' + esc(o.status) + '" data-oid="' + o._id + '" aria-label="ສະຖານະ">' + Object.keys(ST).map((k) => '<option value="' + k + '"' + (k === o.status ? " selected" : "") + ">" + ST[k] + "</option>").join("") + "</select>";
@@ -80,7 +80,7 @@ function dash() {
   const low = products.filter((p) => Number(p.stock) < LOW).sort((a, b) => a.stock - b.stock);
   const nd = new Date();
   const prof = orders.filter((o) => { const t = when(o); return ok(o) && t && t.getMonth() === nd.getMonth() && t.getFullYear() === nd.getFullYear(); }).reduce((a, o) => a + profitOf(o), 0);
-  $("stats").innerHTML = [["ລາຍຮັບວັນນີ້", fmt(rev)], ["ອໍເດີໃໝ່ (ລໍຖ້າ)", nNew], ["ອໍເດີທັງໝົດ", orders.length], ["ສິນຄ້າໃກ້ໝົດ", low.length], ["ກຳໄລເດືອນນີ້", Object.keys(costs).length ? fmt(prof) : "ຍັງບໍ່ມີລາຄາທຶນ"]]
+  $("stats").innerHTML = [["ລາຍຮັບວັນນີ້", fmt(rev)], ["ອໍເດີໃໝ່ (ລໍຖ້າ)", nNew], ["ອໍເດີທັງໝົດ", orders.length], ["ສິນຄ້າໃກ້ໝົດ", low.length], ["ລໍຖ້າກວດສະລິບ", orders.filter((o) => ok(o) && o.hasSlip && !o.paid).length], ["ຍອດຄ້າງຮັບເງິນ", fmt(orders.filter((o) => ok(o) && !o.paid && o.payMethod).reduce((a, o) => a + Number(o.total || 0), 0))], ["ກຳໄລເດືອນນີ້", Object.keys(costs).length ? fmt(prof) : "ຍັງບໍ່ມີລາຄາທຶນ"]]
     .map((s) => '<div class="stat"><span>' + s[0] + '</span><b class="num">' + s[1] + "</b></div>").join("");
   $("nb").hidden = !nNew; $("nb").textContent = nNew;
   // ກຣາຟ 7 ວັນ
@@ -121,6 +121,7 @@ document.addEventListener("click", async (e) => {
       tx.delete(doc(db, "orders", o._id));
     });
     else await deleteDoc(doc(db, "orders", o._id));
+    if (o.hasSlip) deleteDoc(doc(db, "slips", o._id)).catch(() => {});
     toast("ລົບອໍເດີແລ້ວ");
   } catch (x) { fail(x); }
 });
@@ -165,12 +166,12 @@ function openForm(p, dup) {
 }
 $("addP").onclick = () => openForm(null);
 $("pclose").onclick = $("pcancel").onclick = () => pd.close();
-function shrink(file) {
+function shrink(file, max = 800, q = 0.8) {
   return new Promise((ok, no) => {
     const im = new Image(), u = URL.createObjectURL(file);
-    im.onload = () => { const r = Math.min(1, 800 / Math.max(im.width, im.height)), c = document.createElement("canvas");
+    im.onload = () => { const r = Math.min(1, max / Math.max(im.width, im.height)), c = document.createElement("canvas");
       c.width = Math.round(im.width * r); c.height = Math.round(im.height * r); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(u); ok(c.toDataURL("image/jpeg", 0.8)); };
+      URL.revokeObjectURL(u); ok(c.toDataURL("image/jpeg", q)); };
     im.onerror = () => no(new Error("ອ່ານຮູບບໍ່ໄດ້")); im.src = u;
   });
 }
@@ -227,7 +228,7 @@ $("sform").onsubmit = (e) => {
     const refs = lines.map((l) => doc(db, "products", l.doc)), snaps = [];
     for (const r of refs) snaps.push(await tx.get(r));
     snaps.forEach((s, k) => { const left = s.data().stock - lines[k].qty; if (left < 0) throw new Error(lines[k].name + " ເຫຼືອບໍ່ພໍ"); tx.update(refs[k], { stock: left }); });
-    tx.set(oref, clean({ name, phone, payment, address: "ຂາຍໜ້າຮ້ານ", source: "store", status: "delivered", total,
+    tx.set(oref, clean({ name, phone, payment, address: "ຂາຍໜ້າຮ້ານ", source: "store", status: "delivered", paid: true, total,
       items: sitems, createdAt: serverTimestamp() }));
   }).then(() => { sd.close(); return sw({ icon: "success", title: "ບັນທຶກການຂາຍແລ້ວ", text: "ສະຕັອກຖືກຫັກແລ້ວ", showCancelButton: true, confirmButtonText: "ພິມໃບເສັດ", cancelButtonText: "ປິດ" }); })
     .then((r) => { if (r && r.isConfirmed) printReceipt({ _id: oref.id, name, phone, payment, total, items: sitems, _t: new Date() }); }).catch(fail);
@@ -324,6 +325,10 @@ async function setStatus(id, status) {
       tx.update(doc(db, "orders", id), Object.assign({}, p, { restocked: toCancel }));
     });
     toast(toCancel ? "ຍົກເລີກ ແລະ ຄືນສະຕັອກແລ້ວ" : "ອັບເດດສະຖານະແລ້ວ");
+    if (status === "delivered" && !o.paid && o.payMethod === "cash") { // ເກັບເງິນປາຍທາງ: ຖາມວ່າຮັບເງິນແລ້ວບໍ
+      const r = await sw({ icon: "question", title: "ຮັບເງິນສົດແລ້ວບໍ?", text: "ອໍເດີນີ້ເລືອກຈ່າຍເງິນສົດ. ຖ້າຮັບເງິນແລ້ວ ກົດ “ຮັບເງິນແລ້ວ” ເພື່ອໝາຍວ່າຊຳລະແລ້ວ.", showCancelButton: true, confirmButtonText: "ຮັບເງິນແລ້ວ", cancelButtonText: "ຍັງບໍ່ໄດ້ຮັບ" });
+      if (r.isConfirmed) await updateDoc(doc(db, "orders", id), { paid: true, paidAt: serverTimestamp(), payment: "cash" });
+    }
   } catch (e) { fail(e); drawAll(); }
 }
 let viewing = null; const od = $("odlg");
@@ -341,9 +346,13 @@ function drawOrder() {
   $("obody").innerHTML = kv("ລູກຄ້າ", esc(o.name)) + kv("ເບີໂທ", esc(phoneOf(o) || "—")) + kv("ທີ່ຢູ່", esc(o.address)) + kv("ເວລາ", esc(fdate(when(o)))) + kv("ຊ່ອງທາງ", o.source === "store" ? "ໜ້າຮ້ານ" : "ອອນລາຍ") +
     "<h4>ລາຍການ</h4>" + (o.items || []).map((i, k) => kv(esc(i.name) + " ×" + esc(i.qty), fmt(i.price * i.qty)) + '<input class="sn" data-sn="' + k + '" value="' + esc(i.serial || "") + '" placeholder="Serial (ຫຼາຍເຄື່ອງ ຂັ້ນດ້ວຍ ,)">' + (warText(i) ? '<small class="muted">ຮັບປະກັນ ' + esc(warText(i)) + "</small>" : "")).join("") +
     '<div class="tot2"><span>ລວມ</span><b class="num">' + fmt(o.total) + "</b></div>" + (hasCost ? kv("ກຳໄລ (ເຫັນສະເພາະ admin)", fmt(profitOf(o))) : "") +
+    "<h4>ການຊຳລະ</h4>" + kv("ວິທີທີ່ລູກຄ້າເລືອກ", PAYM[o.payMethod] || "ບໍ່ລະບຸ") + kv("ສະຖານະ", o.paid ? "ຊຳລະແລ້ວ" : o.hasSlip ? "ລໍຖ້າກວດສະລິບ" : o.payMethod === "cash" ? "ຍັງບໍ່ໄດ້ເກັບເງິນ (ເກັບປາຍທາງ / ທີ່ຮ້ານ)" : "ຍັງບໍ່ໄດ້ຮັບເງິນ") +
+    (o.hasSlip ? '<div id="o-slip" class="slipbox muted">ກຳລັງໂຫຼດສະລິບ...</div>' : "") +
+    '<div class="oact">' + (o.paid ? '<button class="ghost" id="o-unpaid">ຍົກເລີກການຢືນຢັນຮັບເງິນ</button>' : '<button class="btn" id="o-paid">ຢືນຢັນຮັບເງິນແລ້ວ</button>') + "</div>" +
     '<label>ສະຖານະ<select id="o-st" class="st ' + esc(o.status) + '">' + Object.keys(ST).map((k) => '<option value="' + k + '"' + (k === o.status ? " selected" : "") + ">" + ST[k] + "</option>").join("") + "</select></label>" +
     '<label>ວິທີຊຳລະ<select id="o-pay">' + Object.keys(PAY).map((k) => '<option value="' + k + '"' + (k === (o.payment || "") ? " selected" : "") + ">" + PAY[k] + "</option>").join("") + "</select></label>" +
     '<div class="oact"><button class="btn" id="o-wa">ທັກລູກຄ້າທາງ WhatsApp</button><button class="ghost" id="o-pr">ພິມໃບເສັດ</button></div>';
+  if (o.hasSlip) loadSlip();
 }
 od.onchange = (e) => {
   if (e.target.dataset.sn !== undefined) {
@@ -362,6 +371,9 @@ od.onclick = (e) => {
     window.open("https://wa.me/" + n + "?text=" + encodeURIComponent(waMsg(o)), "_blank", "noopener");
   }
   if (e.target.id === "o-pr") printReceipt(o);
+  if (e.target.id === "o-paid") updateDoc(doc(db, "orders", o._id), { paid: true, paidAt: serverTimestamp(), payment: o.payMethod === "cash" ? "cash" : o.payMethod === "transfer" ? "transfer" : (o.payment || "") }).then(() => toast("ຢືນຢັນຮັບເງິນແລ້ວ")).catch(fail);
+  if (e.target.id === "o-unpaid") updateDoc(doc(db, "orders", o._id), { paid: false }).then(() => toast("ຍົກເລີກການຢືນຢັນແລ້ວ")).catch(fail);
+  if (e.target.classList.contains("slipimg")) sw({ imageUrl: e.target.src, imageAlt: "ສະລິບ", showConfirmButton: false, showCloseButton: true, width: 520 });
 };
 $("oclose").onclick = () => od.close();
 od.addEventListener("click", (e) => { if (e.target === od) od.close(); });
@@ -387,11 +399,12 @@ function printReceipt(o) {
 function fillSettings() {
   if ($("setform").contains(document.activeElement)) return;
   $("st-wa").value = settings.whatsapp || ""; $("st-addr").value = settings.address || ""; $("st-hours").value = settings.hours || "";
+  qrData = settings.qrImage || ""; drawQr();
   $("st-fb").value = settings.facebook || ""; $("st-note").value = settings.note || ""; $("st-map").value = settings.map || ""; $("st-pay").value = settings.payinfo || ""; $("st-ship").value = settings.shipinfo || "";
 }
 $("setform").onsubmit = (e) => {
   e.preventDefault();
-  const data = { whatsapp: normPhone($("st-wa").value), address: $("st-addr").value.trim(), hours: $("st-hours").value.trim(), facebook: $("st-fb").value.trim(), note: $("st-note").value.trim(), map: $("st-map").value.trim(), payinfo: $("st-pay").value.trim(), shipinfo: $("st-ship").value.trim() };
+  const data = { whatsapp: normPhone($("st-wa").value), address: $("st-addr").value.trim(), hours: $("st-hours").value.trim(), facebook: $("st-fb").value.trim(), note: $("st-note").value.trim(), map: $("st-map").value.trim(), payinfo: $("st-pay").value.trim(), shipinfo: $("st-ship").value.trim(), qrImage: qrData };
   if (data.map && !/^https?:\/\//.test(data.map)) { sw({ icon: "warning", title: "ລິ້ງແຜນທີ່ຕ້ອງຂຶ້ນຕົ້ນດ້ວຍ https://" }); return; }
   if (data.facebook && !/^https:\/\//.test(data.facebook)) { sw({ icon: "warning", title: "ລິ້ງ Facebook ຕ້ອງຂຶ້ນຕົ້ນດ້ວຍ https://" }); return; }
   setDoc(doc(db, "settings", "shop"), data).then(() => toast("ບັນທຶກການຕັ້ງຄ່າແລ້ວ")).catch(fail);
@@ -409,7 +422,7 @@ function dateOk(o) {
 }
 function filteredOrders() {
   const q = $("oq").value.toLowerCase().trim();
-  return orders.filter((o) => (ofil === "all" || o.status === ofil) && dateOk(o) && ((o.name || "") + " " + (o.phone || "") + " " + (o.address || "")).toLowerCase().includes(q));
+  return orders.filter((o) => (ofil === "all" || o.status === ofil) && dateOk(o) && ($("opay").value === "all" || payState(o) === $("opay").value) && ((o.name || "") + " " + (o.phone || "") + " " + (o.address || "")).toLowerCase().includes(q));
 }
 function csv(rows) { return "\ufeff" + rows.map((r) => r.map((c) => { const v = String(c == null ? "" : c); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(",")).join("\r\n"); }
 function download(name, text) {
@@ -517,3 +530,30 @@ function drawWarranty() {
 }
 $("wq").oninput = drawWarranty;
 $("wfil").onclick = (e) => { const b = e.target.closest("[data-wf]"); if (b) { wfil = b.dataset.wf; drawWarranty(); } };
+
+// ---------- ການຊຳລະ: ປ້າຍ, ສະລິບ, QR ຮ້ານ ----------
+const PAYM = { transfer: "ໂອນຜ່ານ QR", cash: "ຈ່າຍເງິນສົດ (ຕອນຮັບເຄື່ອງ / ທີ່ຮ້ານ)" };
+const payState = (o) => (o.paid ? "paid" : o.hasSlip ? "slip" : o.payMethod === "cash" ? "cod" : o.payMethod === "transfer" ? "wait" : "none");
+function payBadge(o) {
+  if (o.paid) return ' <span class="badge">ຊຳລະແລ້ວ</span>';
+  if (o.hasSlip) return ' <span class="badge low">ລໍຖ້າກວດສະລິບ</span>';
+  if (o.payMethod === "transfer") return ' <span class="badge low">ລໍຖ້າໂອນ</span>';
+  if (o.payMethod === "cash") return ' <span class="badge low">ເກັບເງິນປາຍທາງ</span>';
+  return "";
+}
+const slipCache = {};
+async function loadSlip() {
+  const el = $("o-slip"), id = viewing; if (!el) return;
+  try {
+    if (!slipCache[id]) { const sn = await getDoc(doc(db, "slips", id)); slipCache[id] = sn.exists() ? (sn.data().img || "") : ""; }
+    if ($("o-slip") && viewing === id) $("o-slip").innerHTML = slipCache[id] ? '<img class="slipimg" src="' + slipCache[id] + '" alt="ສະລິບ" title="ກົດເພື່ອຂະຫຍາຍ">' : "ບໍ່ພົບຮູບສະລິບ";
+  } catch (e) { if ($("o-slip")) $("o-slip").textContent = "ໂຫຼດສະລິບບໍ່ໄດ້: " + (e.message || e); }
+}
+let qrData = "";
+function drawQr() { $("st-qr-prev").innerHTML = qrData ? '<div><img src="' + qrData + '" alt="QR"><button type="button" id="st-qr-rm" aria-label="ລຶບ">&times;</button></div>' : ""; }
+$("st-qr").onchange = async (e) => {
+  try { const f = e.target.files[0]; if (f) { qrData = await shrink(f, 700, 0.92); drawQr(); } } catch (x) { fail(x); }
+  e.target.value = "";
+};
+$("st-qr-prev").onclick = (e) => { if (e.target.id === "st-qr-rm") { qrData = ""; drawQr(); } };
+$("opay").onchange = drawOrders;

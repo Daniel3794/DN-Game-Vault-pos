@@ -91,7 +91,7 @@ dialog::backdrop{background:#050a1499}
 .sl button{border:0;background:none;color:var(--bad);font-size:20px;line-height:1}
 
 .brand{display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px}
-.brand img{border-radius:9px;display:block}
+.brand img{border-radius:50%;display:block}
 .brand small{flex-basis:100%;margin:0}
 .auth .brand small{flex-basis:auto}
 
@@ -116,3 +116,7 @@ dialog::backdrop{background:#050a1499}
 .sn{margin-top:4px;font-size:14px}
 .ord .sub{display:block;color:var(--mute);font-size:13px}
 @media (max-width:860px){nav{overflow-x:auto}nav a{flex:0 0 auto;padding:10px 14px;white-space:nowrap}.rline{grid-template-columns:1fr 1fr}.rline select{grid-column:1/-1}}
+
+.slipbox{background:var(--bg);border:1px dashed var(--line);border-radius:12px;padding:8px;text-align:center}
+.slipimg{max-width:100%;max-height:300px;border-radius:10px;cursor:zoom-in}
+#st-qr-prev img{width:120px;height:auto;border-radius:10px;border:1px solid var(--line);background:#fff;display:block}
