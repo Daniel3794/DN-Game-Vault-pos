@@ -94,7 +94,7 @@ function route() {
 window.addEventListener("hashchange", route);
 
 // ---------- ພາບລວມ ----------
-const orderRow = (o, ctl) => '<article class="ord s-' + esc(o.status) + '" data-view="' + o._id + '"><div><b>' + esc(o.name) + '</b>' + (o.source === "store" ? ' <span class="badge">ໜ້າຮ້ານ</span>' : "") + payBadge(o) + '<small>' + esc(fdate(when(o))) + ' · ' + esc(o.phone ? o.phone + " · " : "") + esc(o.address) + '</small></div>' +
+const orderRow = (o, ctl) => '<article class="ord s-' + esc(o.status) + '" data-view="' + o._id + '"><div><b>' + esc(o.name) + '</b>' + (o.source === "store" ? ' <span class="badge">ໜ້າຮ້ານ</span>' : "") + payBadge(o) + (o.hasPre ? ' <span class="badge low">ມີສັ່ງຈອງ</span>' : "") + '<small>' + esc(fdate(when(o))) + ' · ' + esc(o.phone ? o.phone + " · " : "") + esc(o.address) + '</small></div>' +
   '<div>' + (o.items || []).map((i) => esc(i.name) + " ×" + esc(i.qty)).join(", ") + '</div>' +
   '<div style="text-align:right"><b class="num">' + fmt(o.total) + '</b><br>' + ctl + ' <button class="ghost del" data-odel="' + o._id + '" aria-label="ລົບອໍເດີ">ລົບ</button></div></article>';
 const sel = (o) => '<select class="st ' + esc(o.status) + '" data-oid="' + o._id + '" aria-label="ສະຖານະ">' + Object.keys(ST).map((k) => '<option value="' + k + '"' + (k === o.status ? " selected" : "") + ">" + ST[k] + "</option>").join("") + "</select>";
@@ -164,7 +164,7 @@ function drawProducts() {
     const vs = vars(p), s = totalStock(p), im = (p.images || [])[0], pr = vs.length ? Math.min(...vs.map((v) => Number(v.price) || 0)) : Number(p.price), vr = vs.length > 1 && vs.some((v) => Number(v.price) !== Number(vs[0].price));
     return '<article class="pc">' + (im ? '<img src="' + esc(im) + '" alt="' + esc(p.name) + '">' : '<div class="ph">' + esc((p.brand || "?")[0]) + "</div>") +
       '<div class="pb"><b>' + esc(p.name) + '</b>' + (p.hidden ? ' <span class="badge low">ເຊື່ອງ</span>' : "") + '<span class="muted">' + esc(p.brand) + " · " + esc(p.category) + "</span>" +
-      '<div class="r"><b class="num">' + (vr ? "ເລີ່ມ " : "") + fmt(pr) + '</b><span class="badge ' + (s < 1 ? "out" : s < LOW ? "low" : "") + '">' + (s < 1 ? "ໝົດ" : "ມີ " + s) + "</span></div></div>" +
+      '<div class="r"><b class="num">' + (vr ? "ເລີ່ມ " : "") + fmt(pr) + '</b><span class="badge ' + (s < 1 ? "out" : s < LOW ? "low" : "") + '">' + (s < 1 ? (p.preorder ? "ໝົດ · ສັ່ງຈອງ" : "ໝົດ") : "ມີ " + s) + "</span></div></div>" +
       (vs.length ? vs.map((v, i) => '<div class="stk"><button class="ghost" data-stk="' + p._id + '" data-vi="' + i + '" data-d="-1" aria-label="ຫຼຸດສະຕັອກ">−</button><span>' + esc(v.name) + ' ' + (Number(v.stock) || 0) + '</span><button class="ghost" data-stk="' + p._id + '" data-vi="' + i + '" data-d="1" aria-label="ເພີ່ມສະຕັອກ">+</button></div>').join("")
         : '<div class="stk"><button class="ghost" data-stk="' + p._id + '" data-d="-1" aria-label="ຫຼຸດສະຕັອກ">−</button><span>ສະຕັອກ ' + (Number(p.stock) || 0) + '</span><button class="ghost" data-stk="' + p._id + '" data-d="1" aria-label="ເພີ່ມສະຕັອກ">+</button></div>') +
       '<div class="acts"><button class="ghost" data-edit="' + p._id + '">ແກ້ໄຂ</button><button class="ghost" data-dup="' + p._id + '">ສຳເນົາ</button><button class="ghost" data-del="' + p._id + '">ລົບ</button></div></article>';
@@ -188,7 +188,7 @@ function openForm(p, dup) {
   $("ptitle").textContent = p && !dup ? "ແກ້ໄຂສິນຄ້າ" : dup ? "ສຳເນົາສິນຄ້າ" : "ເພີ່ມສິນຄ້າ";
   if (p) { $("f-name").value = p.name + (dup ? " (ສຳເນົາ)" : ""); $("f-brand").value = p.brand; $("f-cat").value = p.category; $("f-type").value = p.type || "l";
     $("f-price").value = p.price; $("f-stock").value = p.stock; $("f-cost").value = costs[p._id] ?? costs[p.id] ?? "";
-    $("f-old").value = p.oldPrice || ""; $("f-hide").checked = !!p.hidden; $("f-war").value = p.warranty || ""; $("f-cond").value = p.condition || "new"; $("f-desc").value = p.description || ""; $("f-specs").value = (p.specs || []).map((s) => s.k + ": " + s.v).join("\n"); }
+    $("f-old").value = p.oldPrice || ""; $("f-hide").checked = !!p.hidden; $("f-pre").checked = !!p.preorder; $("f-eta").value = p.preorderEta || ""; $("f-war").value = p.warranty || ""; $("f-cond").value = p.condition || "new"; $("f-desc").value = p.description || ""; $("f-specs").value = (p.specs || []).map((s) => s.k + ": " + s.v).join("\n"); }
   vrows = p && Array.isArray(p.variants) ? p.variants.map((v) => ({ name: v.name || "", price: v.price ?? "", stock: v.stock ?? "", image: v.image || "", imageIndex: Number.isInteger(v.imageIndex) ? v.imageIndex : null })) : []; drawV();
   renderPrev(); pd.showModal();
 }
@@ -205,7 +205,7 @@ function shrink(file, max = 800, q = 0.8) {
 }
 function renderPrev() { $("prev").innerHTML = imgs.map((u, i) => '<div><img src="' + u + '" alt="ຮູບ ' + (i + 1) + '"><button type="button" data-rm="' + i + '" aria-label="ລົບຮູບ">&times;</button></div>').join(""); drawV(); }
 $("f-files").onchange = async (e) => {
-  try { for (const f of Array.from(e.target.files)) { if (imgs.length >= 6) break; imgs.push(await shrink(f)); } } catch (x) { fail(x); }
+  try { for (const f of Array.from(e.target.files)) { if (imgs.length >= 4) break; imgs.push(await shrink(f)); } } catch (x) { fail(x); }
   e.target.value = ""; renderPrev();
 };
 $("prev").onclick = (e) => { const b = e.target.closest("[data-rm]"); if (b) { const i = +b.dataset.rm; imgs.splice(i, 1); vrows.forEach((v) => { if (v.imageIndex === i) v.imageIndex = null; else if (v.imageIndex > i) v.imageIndex--; }); renderPrev(); } };
@@ -232,7 +232,7 @@ $("pform").onsubmit = (e) => {
   if (vrows.length && !vs.length) { sw({ icon: "warning", title: "ໃສ່ຊື່ແບບຢ່າງໜ້ອຍ 1 ແບບ", text: "ຫຼື ກົດ × ເອົາແຖວແບບອອກ" }); return; }
   const specs = $("f-specs").value.split("\n").map((l) => { const i = l.indexOf(":"); return i > 0 ? { k: l.slice(0, i).trim(), v: l.slice(i + 1).trim() } : null; }).filter(Boolean);
   const data = { name: $("f-name").value.trim(), brand: $("f-brand").value.trim(), category: $("f-cat").value, type: $("f-type").value,
-                 price: vs.length ? Math.min(...vs.map((v) => v.price)) : Number($("f-price").value), stock: vs.length ? vs.reduce((a, v) => a + v.stock, 0) : Number($("f-stock").value), variants: vs, specs, images: imgs, oldPrice: Number($("f-old").value) || 0, hidden: $("f-hide").checked, warranty: $("f-war").value.trim(), condition: $("f-cond").value, description: $("f-desc").value.trim() };
+                 price: vs.length ? Math.min(...vs.map((v) => v.price)) : Number($("f-price").value), stock: vs.length ? vs.reduce((a, v) => a + v.stock, 0) : Number($("f-stock").value), variants: vs, specs, images: imgs, oldPrice: Number($("f-old").value) || 0, hidden: $("f-hide").checked, preorder: $("f-pre").checked, preorderEta: $("f-eta").value.trim(), warranty: $("f-war").value.trim(), condition: $("f-cond").value, description: $("f-desc").value.trim() };
   const prod = editing ? products.find((x) => x._id === editing) : null, cost = Number($("f-cost").value) || 0;
   const withId = Object.assign({}, data, prod && prod.id != null ? {} : { id: Date.now() % 1000000000 }); // ສິນຄ້າທີ່ເພີ່ມເອງໃນ Console ຈະໄດ້ id ຕອນບັນທຶກ
   (editing ? updateDoc(doc(db, "products", editing), clean(withId)).then(() => editing) : addDoc(collection(db, "products"), clean(withId)).then((r) => r.id))
@@ -346,7 +346,7 @@ const PAY = { "": "ຍັງບໍ່ລະບຸ", cash: "ເງິນສົດ
 const normPhone = (v) => { const d = String(v || "").replace(/\D/g, ""); return !d ? "" : d.indexOf("856") === 0 ? d : "856" + d.replace(/^0+/, ""); };
 const phoneOf = (o) => o.phone || ((String(o.name || "").match(/\d[\d\s-]{6,}\d/) || [""])[0]);
 function stockLines(o) {
-  return (o.items || []).map((i) => { const p = products.find((x) => x._id === i.pid) || products.find((x) => x.id == i.id); return p ? { ref: doc(db, "products", p._id), qty: Number(i.qty || 0), name: i.name, vi: i.vi } : null; }).filter(Boolean);
+  return (o.items || []).filter((i) => !i.pre).map((i) => { const p = products.find((x) => x._id === i.pid) || products.find((x) => x.id == i.id); return p ? { ref: doc(db, "products", p._id), qty: Number(i.qty || 0), name: i.name, vi: i.vi } : null; }).filter(Boolean);
 }
 async function setStatus(id, status) {
   const o = orders.find((x) => x._id === id); if (!o) return;

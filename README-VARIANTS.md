@@ -37,3 +37,9 @@ Send the rules file to review/update it.
 Each variant row has a picker with the product photos: click the photo that matches the variant (click again to clear).
 Stored as `imageIndex` (position in the product's `images`), so no extra image data is added to the document.
 Removing a product photo automatically fixes the variants that pointed to it.
+
+## Pre-order
+Product form: tick "Pre-order when sold out" (+ optional ETA text). Stored as `preorder` (bool) and `preorderEta` (string) on the product.
+Orders: items bought as pre-order carry `pre: true` and a "[ສັ່ງຈອງ]" tag in the name; the order has `hasPre: true`
+and shows a "ມີສັ່ງຈອງ" badge in the order list. Pre-order items never touch stock, and are skipped when an order is cancelled/restocked.
+When the goods arrive, use "Stock-in", then fulfil the pre-order orders by hand.
