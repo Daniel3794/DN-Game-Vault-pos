@@ -205,7 +205,7 @@ function shrink(file, max = 800, q = 0.8) {
 }
 function renderPrev() { $("prev").innerHTML = imgs.map((u, i) => '<div><img src="' + u + '" alt="ຮູບ ' + (i + 1) + '"><button type="button" data-rm="' + i + '" aria-label="ລົບຮູບ">&times;</button></div>').join(""); drawV(); }
 $("f-files").onchange = async (e) => {
-  try { for (const f of Array.from(e.target.files)) { if (imgs.length >= 4) break; imgs.push(await shrink(f)); } } catch (x) { fail(x); }
+  try { for (const f of Array.from(e.target.files)) { if (imgs.length >= 12) break; imgs.push(await shrink(f)); } } catch (x) { fail(x); }
   e.target.value = ""; renderPrev();
 };
 $("prev").onclick = (e) => { const b = e.target.closest("[data-rm]"); if (b) { const i = +b.dataset.rm; imgs.splice(i, 1); vrows.forEach((v) => { if (v.imageIndex === i) v.imageIndex = null; else if (v.imageIndex > i) v.imageIndex--; }); renderPrev(); } };
