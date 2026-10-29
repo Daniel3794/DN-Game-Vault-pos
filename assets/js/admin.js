@@ -11,7 +11,14 @@ const short = (n) => n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, "") + "M" :
 const ST = { new: "ໃໝ່", confirmed: "ຢືນຢັນແລ້ວ", delivered: "ສົ່ງແລ້ວ", cancelled: "ຍົກເລີກ" };
 const TITLES = { dash: "ພາບລວມ", orders: "ອໍເດີ", products: "ສິນຄ້າ", report: "ລາຍງານ", settings: "ຕັ້ງຄ່າ", stockin: "ຮັບເຄື່ອງເຂົ້າ", warranty: "ຮັບປະກັນ / Serial" };
 const LOW = 5;
-const LEGC = {"ແລັບທ໋ອບ": "ໂນ໊ດບຸ໊ກ (Laptop)", "ຄອມຕັ້ງໂຕະ": "ຈັດເຊັດ ຄອມພິວເຕີ (Desktop)", "ຊິ້ນສ່ວນ": "ອຸປະກອນເສີມ (Accessories)"}; // ຊື່ໝວດເກົ່າ → ໝວດໃໝ່
+const LEGC = [
+  "ຈັດເຊັດ ຄອມພິວເຕີ (Desktop)",
+  "ໂນ໊ດບຸ໊ກ (Laptop)",
+  "ກາດຈໍ (GPU)",
+  "ເກມມິ່ງເກຍ (Gaming Gear)",
+  "ໜ້າຈໍຄອມ (Monitor)",
+  "ອຸປະກອນເສີມ (Accessories)"
+]; // ຊື່ໝວດເກົ່າ → ໝວດໃໝ່
 // ---------- ແບບ / ຕົວເລືອກ (variants): ແຕ່ລະແບບມີລາຄາ ແລະ ສະຕັອກຂອງຕົນ ----------
 let vrows = [];
 const vars = (p) => (Array.isArray(p.variants) ? p.variants : []);
