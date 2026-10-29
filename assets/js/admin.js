@@ -11,6 +11,7 @@ const short = (n) => n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, "") + "M" :
 const ST = { new: "ໃໝ່", confirmed: "ຢືນຢັນແລ້ວ", delivered: "ສົ່ງແລ້ວ", cancelled: "ຍົກເລີກ" };
 const TITLES = { dash: "ພາບລວມ", orders: "ອໍເດີ", products: "ສິນຄ້າ", report: "ລາຍງານ", settings: "ຕັ້ງຄ່າ", stockin: "ຮັບເຄື່ອງເຂົ້າ", warranty: "ຮັບປະກັນ / Serial" };
 const LOW = 5;
+const LEGC = {"ແລັບທ໋ອບ": "ໂນ໊ດບຸ໊ກ (Laptop)", "ຄອມຕັ້ງໂຕະ": "ຈັດເຊັດ ຄອມພິວເຕີ (Desktop)", "ຊິ້ນສ່ວນ": "ອຸປະກອນເສີມ (Accessories)"}; // ຊື່ໝວດເກົ່າ → ໝວດໃໝ່
 // ---------- ແບບ / ຕົວເລືອກ (variants): ແຕ່ລະແບບມີລາຄາ ແລະ ສະຕັອກຂອງຕົນ ----------
 let vrows = [];
 const vars = (p) => (Array.isArray(p.variants) ? p.variants : []);
@@ -163,7 +164,7 @@ function drawProducts() {
   $("plist").innerHTML = l.map((p) => {
     const vs = vars(p), s = totalStock(p), im = (p.images || [])[0], pr = vs.length ? Math.min(...vs.map((v) => Number(v.price) || 0)) : Number(p.price), vr = vs.length > 1 && vs.some((v) => Number(v.price) !== Number(vs[0].price));
     return '<article class="pc">' + (im ? '<img src="' + esc(im) + '" alt="' + esc(p.name) + '">' : '<div class="ph">' + esc((p.brand || "?")[0]) + "</div>") +
-      '<div class="pb"><b>' + esc(p.name) + '</b>' + (p.hidden ? ' <span class="badge low">ເຊື່ອງ</span>' : "") + '<span class="muted">' + esc(p.brand) + " · " + esc(p.category) + "</span>" +
+      '<div class="pb"><b>' + esc(p.name) + '</b>' + (p.hidden ? ' <span class="badge low">ເຊື່ອງ</span>' : "") + '<span class="muted">' + esc(p.brand) + " · " + esc(LEGC[p.category] || p.category) + "</span>" +
       '<div class="r"><b class="num">' + (vr ? "ເລີ່ມ " : "") + fmt(pr) + '</b><span class="badge ' + (s < 1 ? "out" : s < LOW ? "low" : "") + '">' + (s < 1 ? (p.preorder ? "ໝົດ · ສັ່ງຈອງ" : "ໝົດ") : "ມີ " + s) + "</span></div></div>" +
       (vs.length ? vs.map((v, i) => '<div class="stk"><button class="ghost" data-stk="' + p._id + '" data-vi="' + i + '" data-d="-1" aria-label="ຫຼຸດສະຕັອກ">−</button><span>' + esc(v.name) + ' ' + (Number(v.stock) || 0) + '</span><button class="ghost" data-stk="' + p._id + '" data-vi="' + i + '" data-d="1" aria-label="ເພີ່ມສະຕັອກ">+</button></div>').join("")
         : '<div class="stk"><button class="ghost" data-stk="' + p._id + '" data-d="-1" aria-label="ຫຼຸດສະຕັອກ">−</button><span>ສະຕັອກ ' + (Number(p.stock) || 0) + '</span><button class="ghost" data-stk="' + p._id + '" data-d="1" aria-label="ເພີ່ມສະຕັອກ">+</button></div>') +
@@ -186,7 +187,7 @@ const pd = $("pdlg");
 function openForm(p, dup) {
   editing = p && !dup ? p._id : null; $("pform").reset(); imgs = p ? (p.images || []).slice() : [];
   $("ptitle").textContent = p && !dup ? "ແກ້ໄຂສິນຄ້າ" : dup ? "ສຳເນົາສິນຄ້າ" : "ເພີ່ມສິນຄ້າ";
-  if (p) { $("f-name").value = p.name + (dup ? " (ສຳເນົາ)" : ""); $("f-brand").value = p.brand; $("f-cat").value = p.category; $("f-type").value = p.type || "l";
+  if (p) { $("f-name").value = p.name + (dup ? " (ສຳເນົາ)" : ""); $("f-brand").value = p.brand; $("f-cat").value = LEGC[p.category] || p.category; $("f-type").value = p.type || "l";
     $("f-price").value = p.price; $("f-stock").value = p.stock; $("f-cost").value = costs[p._id] ?? costs[p.id] ?? "";
     $("f-old").value = p.oldPrice || ""; $("f-hide").checked = !!p.hidden; $("f-pre").checked = !!p.preorder; $("f-eta").value = p.preorderEta || ""; $("f-war").value = p.warranty || ""; $("f-cond").value = p.condition || "new"; $("f-desc").value = p.description || ""; $("f-specs").value = (p.specs || []).map((s) => s.k + ": " + s.v).join("\n"); }
   vrows = p && Array.isArray(p.variants) ? p.variants.map((v) => ({ name: v.name || "", price: v.price ?? "", stock: v.stock ?? "", image: v.image || "", imageIndex: Number.isInteger(v.imageIndex) ? v.imageIndex : null })) : []; drawV();
